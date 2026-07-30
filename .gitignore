@@ -4,6 +4,7 @@ node_modules/
 # Build artifacts
 dist/
 *.tsbuildinfo
+.lmstudio/dev.js
 
 # Logs
 *.log

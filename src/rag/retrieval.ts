@@ -233,13 +233,13 @@ export async function retrievePassages(
 }
 
 export interface IndexStatusParams {
-  documentsDirectory: string;
+  documentsDirs: string[];
   vectorStoreDirectory: string;
   embeddingModelId: string;
 }
 
 export interface IndexStatusResult {
-  documentsDirectory: string;
+  documentsDirs: string[];
   vectorStoreDirectory: string;
   embeddingModelId: string;
   totalChunks: number;
@@ -249,7 +249,7 @@ export interface IndexStatusResult {
 export async function getIndexStatus(
   params: IndexStatusParams,
 ): Promise<IndexStatusResult | { error: string }> {
-  const { documentsDirectory, vectorStoreDirectory, embeddingModelId } = params;
+  const { documentsDirs, vectorStoreDirectory, embeddingModelId } = params;
 
   if (!vectorStoreDirectory.trim()) {
     return { error: "Vector store directory is not configured." };
@@ -259,7 +259,7 @@ export async function getIndexStatus(
   const stats = await store.getStats();
 
   return {
-    documentsDirectory,
+    documentsDirs,
     vectorStoreDirectory,
     embeddingModelId: resolveEmbeddingModelId(embeddingModelId),
     totalChunks: stats.totalChunks,

@@ -7,7 +7,7 @@ import { syncEmbeddingManifestAfterIndexing } from "../utils/embeddingIndexManif
 export interface RunIndexingParams {
   client: LMStudioClient;
   abortSignal: AbortSignal;
-  documentsDir: string;
+  documentsDirs: string[];
   vectorStoreDir: string;
   embeddingModelId: string;
   chunkSize: number;
@@ -41,7 +41,7 @@ export interface RunIndexingResult {
 export async function runIndexingJob({
   client,
   abortSignal,
-  documentsDir,
+  documentsDirs,
   vectorStoreDir,
   embeddingModelId,
   chunkSize,
@@ -67,7 +67,7 @@ export async function runIndexingJob({
   const embeddingModel = await client.embedding.model(resolvedModelId, { signal: abortSignal });
 
   const indexManager = new IndexManager({
-    documentsDir,
+    documentsDirs,
     vectorStore,
     vectorStoreDir,
     embeddingModel,

@@ -10,6 +10,7 @@ import * as path from "path";
 import { runIndexingJob } from "./ingestion/runIndexing";
 import { parseExcludePatternsBlock } from "./utils/fileExcludePatterns";
 import { resolveAdditionalExtensions } from "./utils/additionalExtensions";
+import { parseDocumentPaths } from "./utils/documentPaths";
 import { syncChatToolsSettingsForRest } from "./utils/effectivePluginConfig";
 import {
   ensureVectorStore,
@@ -139,7 +140,7 @@ export async function preprocess(
   syncChatToolsSettingsForRest(pluginConfig);
 
   // Get configuration
-  const documentsDir = pluginConfig.get("documentsDirectory");
+  const documentsDirs = parseDocumentPaths(pluginConfig.get("documentsDirectory"));
   const vectorStoreDir = pluginConfig.get("vectorStoreDirectory");
   const retrievalLimit = pluginConfig.get("retrievalLimit");
   const retrievalThreshold = pluginConfig.get("retrievalAffinityThreshold");
@@ -158,7 +159,7 @@ export async function preprocess(
   );
 
   // Validate configuration
-  if (!documentsDir || documentsDir === "") {
+  if (documentsDirs.length === 0) {
     console.warn("[BigRAG] Documents directory not configured. Please set it in plugin settings.");
     return userMessage;
   }
@@ -170,10 +171,10 @@ export async function preprocess(
 
   try {
     // Re-run sanity checks when paths change or on first run.
-    const resolvedDocumentsDir = path.resolve(documentsDir);
+    const resolvedDocumentsDirs = documentsDirs.map((dir) => path.resolve(dir)).join("\n");
     const resolvedVectorStoreDir = path.resolve(vectorStoreDir);
     const pathsChangedForSanity =
-      resolvedDocumentsDir !== lastSanityCheckedDocumentsDir ||
+      resolvedDocumentsDirs !== lastSanityCheckedDocumentsDir ||
       resolvedVectorStoreDir !== lastSanityCheckedVectorStoreDir;
     if (!sanityChecksPassed || pathsChangedForSanity) {
       const checkStatus = ctl.createStatus({
@@ -181,7 +182,7 @@ export async function preprocess(
         text: "Performing sanity checks...",
       });
 
-      const sanityResult = await performSanityChecks(documentsDir, vectorStoreDir);
+      const sanityResult = await performSanityChecks(documentsDirs, vectorStoreDir);
 
       // Log warnings
       for (const warning of sanityResult.warnings) {
@@ -209,7 +210,7 @@ export async function preprocess(
         text: "Sanity checks passed",
       });
       sanityChecksPassed = true;
-      lastSanityCheckedDocumentsDir = resolvedDocumentsDir;
+      lastSanityCheckedDocumentsDir = resolvedDocumentsDirs;
       lastSanityCheckedVectorStoreDir = resolvedVectorStoreDir;
     }
 
@@ -239,7 +240,7 @@ export async function preprocess(
 
     await maybeHandleConfigTriggeredReindex({
       ctl,
-      documentsDir,
+      documentsDirs,
       vectorStoreDir,
       embeddingModelId: resolvedEmbeddingModelId,
       chunkSize,
@@ -272,7 +273,7 @@ export async function preprocess(
           const { indexingResult } = await runIndexingJob({
             client: ctl.client,
             abortSignal: ctl.abortSignal,
-            documentsDir,
+            documentsDirs,
             vectorStoreDir,
             embeddingModelId: resolvedEmbeddingModelId,
             chunkSize,
@@ -479,7 +480,7 @@ export async function preprocess(
 
 interface ConfigReindexOpts {
   ctl: PromptPreprocessorController;
-  documentsDir: string;
+  documentsDirs: string[];
   vectorStoreDir: string;
   embeddingModelId: string;
   chunkSize: number;
@@ -495,7 +496,7 @@ interface ConfigReindexOpts {
 
 async function maybeHandleConfigTriggeredReindex({
   ctl,
-  documentsDir,
+  documentsDirs,
   vectorStoreDir,
   embeddingModelId,
   chunkSize,
@@ -539,7 +540,7 @@ async function maybeHandleConfigTriggeredReindex({
     const { indexingResult } = await runIndexingJob({
       client: ctl.client,
       abortSignal: ctl.abortSignal,
-      documentsDir,
+      documentsDirs,
       vectorStoreDir,
       embeddingModelId,
       chunkSize,

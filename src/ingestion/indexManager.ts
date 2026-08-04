@@ -38,7 +38,7 @@ type FileIndexOutcome =
   | { type: "failed" };
 
 export interface IndexingOptions {
-  documentsDir: string;
+  documentsDirs: string[];
   vectorStore: VectorStore;
   vectorStoreDir: string;
   embeddingModel: EmbeddingDynamicHandle;
@@ -78,7 +78,7 @@ export class IndexManager {
    * Start the indexing process
    */
   async index(): Promise<IndexingResult> {
-    const { documentsDir, vectorStore, onProgress } = this.options;
+    const { documentsDirs, vectorStore, onProgress } = this.options;
 
     try {
       const fileInventory = await vectorStore.getFileHashInventory();
@@ -125,7 +125,7 @@ export class IndexManager {
           : undefined;
 
       const files = await scanDirectory(
-        documentsDir,
+        documentsDirs,
         (scanned, found) => {
           if (onProgress) {
             onProgress({
@@ -516,7 +516,7 @@ export class IndexManager {
 
     const payload = {
       ...summary,
-      documentsDir: this.options.documentsDir,
+      documentPaths: this.options.documentsDirs,
       failureReasons: this.failureReasonCounts,
       generatedAt: new Date().toISOString(),
     };

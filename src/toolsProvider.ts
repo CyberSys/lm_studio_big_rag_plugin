@@ -2,6 +2,7 @@ import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk";
 import { z } from "zod";
 import { resolveEmbeddingModelId } from "./config";
 import { getIndexStatus, retrievePassages } from "./rag/retrieval";
+import { parseDocumentPaths } from "./utils/documentPaths";
 import { readToolsPluginSettings } from "./utils/effectivePluginConfig";
 
 export async function provideTools(ctl: ToolsProviderController): Promise<Tool[]> {
@@ -108,12 +109,12 @@ export async function provideTools(ctl: ToolsProviderController): Promise<Tool[]
       status("Reading index status…");
 
       const pluginSettings = readToolsPluginSettings(ctl);
-      const documentsDir = pluginSettings.documentsDirectory;
+      const documentsDirs = parseDocumentPaths(pluginSettings.documentsDirectory);
       const vectorStoreDir = pluginSettings.vectorStoreDirectory;
       const embeddingModelId = resolveEmbeddingModelId(pluginSettings.embeddingModel);
 
       const indexStatus = await getIndexStatus({
-        documentsDirectory: documentsDir,
+        documentsDirs,
         vectorStoreDirectory: vectorStoreDir,
         embeddingModelId,
       });

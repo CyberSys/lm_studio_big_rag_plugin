@@ -56,3 +56,26 @@ test("scanDirectory returns empty for empty roots list", async () => {
   const files = await scanDirectory([]);
   assert.deepEqual(files, []);
 });
+
+test("scanDirectory excludes nested paths relative to document root", async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "big-rag-scan-exclude-"));
+  const root = path.join(base, "docs");
+  fs.mkdirSync(path.join(root, "archive"), { recursive: true });
+  fs.writeFileSync(path.join(root, "keep.txt"), "keep me");
+  fs.writeFileSync(path.join(root, "archive", "nested.txt"), "exclude me");
+
+  const excludedRelativePaths: string[] = [];
+  try {
+    const files = await scanDirectory([root], undefined, {
+      excludePatterns: ["archive/**"],
+      onExcludedFile: (info) => {
+        excludedRelativePaths.push(info.relativePath);
+      },
+    });
+    const names = files.map((file) => path.basename(file.path)).sort();
+    assert.deepEqual(names, ["keep.txt"]);
+    assert.deepEqual(excludedRelativePaths, ["archive/nested.txt"]);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});

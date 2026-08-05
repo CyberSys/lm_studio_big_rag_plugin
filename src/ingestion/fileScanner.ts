@@ -68,15 +68,15 @@ export async function scanDirectory(
     console.log(`[Scanner] Scanning ${roots.length} document root(s): ${roots.join(", ")}`);
   }
 
-  async function walk(root: string): Promise<void> {
+  async function walk(currentDir: string, documentRoot: string): Promise<void> {
     try {
-      const entries = await fs.promises.readdir(root, { withFileTypes: true });
+      const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
 
       for (const entry of entries) {
-        const fullPath = path.join(root, entry.name);
+        const fullPath = path.join(currentDir, entry.name);
 
         if (entry.isDirectory()) {
-          await walk(fullPath);
+          await walk(fullPath, documentRoot);
         } else if (entry.isFile()) {
           scannedCount++;
 
@@ -87,7 +87,7 @@ export async function scanDirectory(
             if (seenFilePaths.has(resolvedFullPath)) {
               continue;
             }
-            const relativePosix = toPosixRelativePath(root, fullPath);
+            const relativePosix = toPosixRelativePath(documentRoot, fullPath);
             const matchedPattern =
               excludePatterns.length > 0 ? matchExcludePattern(relativePosix, excludePatterns) : null;
 
@@ -115,24 +115,24 @@ export async function scanDirectory(
         }
       }
     } catch (error) {
-      console.error(`Error scanning directory ${root}:`, error);
+      console.error(`Error scanning directory ${currentDir}:`, error);
     }
   }
 
-  for (const root of roots) {
+  for (const documentRoot of roots) {
     try {
-      await fs.promises.access(root, fs.constants.R_OK);
+      await fs.promises.access(documentRoot, fs.constants.R_OK);
     } catch (err: any) {
       if (err?.code === "ENOENT") {
         console.warn(
-          `[Scanner] Documents directory does not exist, skipping: ${root}. ` +
+          `[Scanner] Documents directory does not exist, skipping: ${documentRoot}. ` +
             "Check the path (e.g. spelling and that the folder exists).",
         );
         continue;
       }
       throw err;
     }
-    await walk(root);
+    await walk(documentRoot, documentRoot);
   }
 
   if (onProgress) {

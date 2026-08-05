@@ -22,8 +22,14 @@ export const configSchematics = createConfigSchematics()
     "string",
     {
       displayName: "Documents Directory",
-      subtitle: "Root directory containing documents to index. All subdirectories will be scanned.",
-      placeholder: "/path/to/documents",
+      subtitle:
+        "Root directories containing documents to index. All subdirectories will be scanned. " +
+        "Multiple paths are supported: separate them with commas or put each on its own line. " +
+        "Missing paths are skipped with a warning.",
+      placeholder:
+        "/path/to/documents, /other/docs, D:\\archive\n" +
+        "Example: C:/docs, D:/library, E:/notes",
+      isParagraph: true,
     },
     "",
   )

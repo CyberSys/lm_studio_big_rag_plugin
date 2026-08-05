@@ -5,12 +5,15 @@ import { resolveEmbeddingModelId } from "./config";
 import { syncEmbeddingManifestAfterIndexing } from "./utils/embeddingIndexManifest";
 import { parseExcludePatternsFromEnv } from "./utils/fileExcludePatterns";
 import { parseAdditionalExtensionsFromEnv, resolveAdditionalExtensions } from "./utils/additionalExtensions";
+import { parseDocumentPathsFromEnv } from "./utils/documentPaths";
 
 async function main() {
-  const documentsDir = process.env.BIG_RAG_DOCS_DIR ?? process.argv[2];
+  const documentsDirs = parseDocumentPathsFromEnv(
+    process.env.BIG_RAG_DOCS_DIR ?? process.argv[2],
+  );
   const vectorStoreDir = process.env.BIG_RAG_DB_DIR ?? process.argv[3];
 
-  if (!documentsDir || !vectorStoreDir) {
+  if (documentsDirs.length === 0 || !vectorStoreDir) {
     console.error(
       "Usage: BIG_RAG_DOCS_DIR=/path/to/docs BIG_RAG_DB_DIR=/path/to/db node dist/cliIndex.js\n" +
         "   or: node dist/cliIndex.js /path/to/docs /path/to/db",
@@ -44,7 +47,7 @@ async function main() {
   const resolvedEmbeddingModelId = resolveEmbeddingModelId(process.env.BIG_RAG_EMBEDDING_MODEL);
 
   console.log("[BigRAG CLI] Starting indexing");
-  console.log(`[BigRAG CLI] Documents dir: ${documentsDir}`);
+  console.log(`[BigRAG CLI] Documents dir(s): ${documentsDirs.join(", ")}`);
   console.log(`[BigRAG CLI] Vector store dir: ${vectorStoreDir}`);
   console.log(`[BigRAG CLI] Embedding model: ${resolvedEmbeddingModelId}`);
   if (excludePatterns.length > 0) {
@@ -84,7 +87,7 @@ async function main() {
   const embeddingModel = await client.embedding.model(resolvedEmbeddingModelId);
 
   const indexManager = new IndexManager({
-    documentsDir,
+    documentsDirs,
     vectorStore,
     vectorStoreDir,
     embeddingModel,

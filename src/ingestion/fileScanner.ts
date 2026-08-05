@@ -37,32 +37,26 @@ function toPosixRelativePath(root: string, fullPath: string): string {
 }
 
 /**
- * Recursively scan a directory for supported files
+ * Recursively scan a list of root directories for supported files.
+ * Missing roots are skipped with a warning; overlapping files (same resolved
+ * absolute path reached from multiple roots) are deduplicated.
  */
 export async function scanDirectory(
-  rootDir: string,
+  rootDirs: string[],
   onProgress?: (current: number, total: number) => void,
   options?: ScanDirectoryOptions,
 ): Promise<ScannedFile[]> {
-  const root = normalizeRootDir(rootDir);
+  const roots = rootDirs
+    .map(normalizeRootDir)
+    .filter((root) => root !== "");
   const excludePatterns = options?.excludePatterns ?? [];
   const additionalPlainTextExtensions = options?.additionalPlainTextExtensions ?? new Set<string>();
   const onExcludedFile = options?.onExcludedFile;
   const effectiveExtensions = buildEffectiveExtensionSet(additionalPlainTextExtensions);
 
-  try {
-    await fs.promises.access(root, fs.constants.R_OK);
-  } catch (err: any) {
-    if (err?.code === "ENOENT") {
-      throw new Error(
-        `Documents directory does not exist: ${root}. Check the path (e.g. spelling and that the folder exists).`,
-      );
-    }
-    throw err;
-  }
-
   const files: ScannedFile[] = [];
   let scannedCount = 0;
+  const seenFilePaths = new Set<string>();
 
   const supportedExtensionsDescription = listSupportedExtensions().join(", ");
   console.log(`[Scanner] Built-in extensions: ${supportedExtensionsDescription}`);
@@ -70,23 +64,30 @@ export async function scanDirectory(
     const additionalList = Array.from(additionalPlainTextExtensions.values()).sort().join(", ");
     console.log(`[Scanner] Additional plain-text extensions: ${additionalList}`);
   }
+  if (roots.length > 0) {
+    console.log(`[Scanner] Scanning ${roots.length} document root(s): ${roots.join(", ")}`);
+  }
 
-  async function walk(dir: string): Promise<void> {
+  async function walk(currentDir: string, documentRoot: string): Promise<void> {
     try {
-      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
 
       for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
+        const fullPath = path.join(currentDir, entry.name);
 
         if (entry.isDirectory()) {
-          await walk(fullPath);
+          await walk(fullPath, documentRoot);
         } else if (entry.isFile()) {
           scannedCount++;
 
           const ext = path.extname(entry.name).toLowerCase();
 
           if (effectiveExtensions.has(ext)) {
-            const relativePosix = toPosixRelativePath(root, fullPath);
+            const resolvedFullPath = path.resolve(fullPath);
+            if (seenFilePaths.has(resolvedFullPath)) {
+              continue;
+            }
+            const relativePosix = toPosixRelativePath(documentRoot, fullPath);
             const matchedPattern =
               excludePatterns.length > 0 ? matchExcludePattern(relativePosix, excludePatterns) : null;
 
@@ -104,6 +105,7 @@ export async function scanDirectory(
                 size: stats.size,
                 mtime: stats.mtime,
               });
+              seenFilePaths.add(resolvedFullPath);
             }
           }
 
@@ -113,11 +115,25 @@ export async function scanDirectory(
         }
       }
     } catch (error) {
-      console.error(`Error scanning directory ${dir}:`, error);
+      console.error(`Error scanning directory ${currentDir}:`, error);
     }
   }
 
-  await walk(root);
+  for (const documentRoot of roots) {
+    try {
+      await fs.promises.access(documentRoot, fs.constants.R_OK);
+    } catch (err: any) {
+      if (err?.code === "ENOENT") {
+        console.warn(
+          `[Scanner] Documents directory does not exist, skipping: ${documentRoot}. ` +
+            "Check the path (e.g. spelling and that the folder exists).",
+        );
+        continue;
+      }
+      throw err;
+    }
+    await walk(documentRoot, documentRoot);
+  }
 
   if (onProgress) {
     onProgress(scannedCount, files.length);

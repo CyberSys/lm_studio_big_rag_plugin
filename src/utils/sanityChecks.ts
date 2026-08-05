@@ -8,20 +8,34 @@ export interface SanityCheckResult {
 }
 
 /**
- * Perform sanity checks before indexing large directories
+ * Perform sanity checks before indexing large directories.
+ * Missing documents paths are skipped with a warning; indexing proceeds with
+ * the paths that exist. An error is raised only if none of the paths exist.
  */
 export async function performSanityChecks(
-  documentsDir: string,
+  documentsDirs: string[],
   vectorStoreDir: string,
 ): Promise<SanityCheckResult> {
   const warnings: string[] = [];
   const errors: string[] = [];
 
+  const existingDirs: string[] = [];
+
   // Check if directories exist
-  try {
-    await fs.promises.access(documentsDir, fs.constants.R_OK);
-  } catch {
-    errors.push(`Documents directory does not exist or is not readable: ${documentsDir}`);
+  for (const documentsDir of documentsDirs) {
+    try {
+      await fs.promises.access(documentsDir, fs.constants.R_OK);
+      existingDirs.push(documentsDir);
+    } catch {
+      warnings.push(
+        `Documents directory does not exist or is not readable, skipping: ${documentsDir}`,
+      );
+    }
+  }
+
+  if (existingDirs.length === 0) {
+    errors.push("None of the configured document directories exist or are readable.");
+    return { passed: errors.length === 0, warnings, errors };
   }
 
   try {
@@ -76,7 +90,10 @@ export async function performSanityChecks(
 
   // Estimate directory size (sample-based for performance)
   try {
-    const sampleSize = await estimateDirectorySize(documentsDir);
+    let sampleSize = 0;
+    for (const dir of existingDirs) {
+      sampleSize += await estimateDirectorySize(dir);
+    }
     const estimatedGB = sampleSize / (1024 * 1024 * 1024);
     
     if (estimatedGB > 100) {

@@ -136,7 +136,7 @@ The plugin provides the following configuration options:
 
 ### Required Settings
 
-- **Documents Directory**: Root directory containing your documents (read access required)
+- **Documents Directory**: Root directory containing your documents (read access required). Multiple roots are supported — separate them with commas or put each on its own line. Example: `/docs/a, /docs/b`. Missing paths are skipped with a warning.
 - **Vector Store Directory**: Where the vector database will be stored (read/write access required)
 
 ### Embedding model
